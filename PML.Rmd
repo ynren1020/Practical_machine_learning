@@ -1,0 +1,168 @@
+---
+title: "PML_courseproject"
+author: "Yanan"
+date: "11/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# download data
+```{r, eval = FALSE}
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(url, "./pml-training.csv")
+url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url, "./pml-testing.csv")
+```
+
+# read in data
+```{r}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+dim(training)
+dim(testing)
+head(training)
+unique(training$user_name)
+names(training)
+training <- training[,-1]
+```
+
+# load caret package 
+```{r}
+library(caret)
+library(rattle)
+```
+
+# exploratory analysis
+
+```{r}
+set.seed(2020)
+# remove NA or ""columns
+discard <- which(colSums(is.na(training) |training=="")>0.9*dim(training)[1]) 
+training.sub <- training[,-discard]
+
+# remove no variance variables
+nsv <- nearZeroVar(training.sub, saveMetrics = TRUE)
+head(nsv) 
+
+# plot predictors
+featurePlot(x = training.sub[,c("roll_belt", "pitch_belt", "yaw_belt")],
+            y = training.sub$classe,
+            plot = "pairs")
+
+# preprocessing with PCA (dimention reduction)
+preProc <- preProcess(training.sub[,-59], method = "pca", thresh = 0.8)
+trainPC <- predict(preProc, training.sub[,-59])
+trainPC <- cbind(training.sub$classe, trainPC)
+names(trainPC)[1] <- "classe"
+testing.sub <- testing[,names(testing)%in%names(training.sub)]
+testPC <- predict(preProc, testing.sub)
+
+```
+
+# fit models 
+## tree based 
+```{r}
+trControl <- trainControl(method = "cv", number = 3)
+model1 <- train(classe ~ ., 
+                method = "rpart", 
+                data = trainPC,
+                trControl = trControl)
+print(model1$finalModel)
+# prediction
+res1 <- predict(model1,testPC)
+res1
+# plot 
+fancyRpartPlot(model1$finalModel)
+# with bagging
+predictors <- trainPC[,-c(1:4)]
+class <- trainPC$classe
+treebag <- bag(predictors, class, B = 10,
+               bagControl = bagControl(fit = ctreeBag$fit,
+                                       predict = ctreeBag$pred,
+                                       aggregate = ctreeBag$aggregate))
+
+res.treebag <- predict(treebag, testPC[-c(1:3)])
+res.treebag
+
+```
+
+
+## random forest 
+### Random forest takes an unusual long time....
+```{r, eval = FALSE}
+model2 <- train(classe ~ ., 
+                data = trainPC, 
+                method = "rf", 
+                prox = TRUE,
+                trControl = trControl)
+#getTree(model2$finalModel, k =2)
+res2 <- predict(model2, testPC)
+res2
+```
+
+## Boosting with tree
+### take too long ...
+```{r, eval = FALSE}
+model3 <- train(classe ~ ., 
+                data = trainPC, 
+                method = "gbm", 
+                verbose = FALSE)
+print(model3)
+res3 <- predict(model3, testPC)
+res3
+```
+
+## model based prediction
+
+```{r}
+# lda
+model4 <- train(classe ~ ., 
+                data = trainPC, 
+                method = "lda",
+                trControl = trControl)
+print(model4)
+res4<- predict(model4, testPC)
+res4
+```
+
+# Agreement among different methods
+```{r}
+table(res1, res.treebag, res4)
+output.df <- data.frame(tree=res1, treebag = res.treebag, lda = res4)
+output.df
+```
+
+
+```{r,echo = FALSE, eval = FALSE}
+# naive bayes
+model5 <- train(classe ~ ., 
+                data = trainPC[,-c(2:4)], 
+                method = "nb")
+print(model5)
+res5<- predict(model5, testPC[,-c(1:3)])
+res5
+## Combining predictors (split training.sub into train and test)
+model3 <- train(classe ~ ., data = training.sub, method = "gbm", verbose = FALSE)
+model4 <- train(classe ~ ., data = training.sub, method = "lda")
+model5 <- train(classe ~ ., data = training.sub, method = "nb")
+
+
+```
+
+
+
+```{r, echo=FALSE, eval=FALSE}
+# forecast 
+tstrain <- ts(training.sub$classe,frequency = 20)
+model6 <- bats(tstrain)
+fcast <- forecast(model6, level = 95, h = dim(testing.sub)[1])
+
+# Exponential smoothing
+ets1 <- ets(tstrain, model = "MMM")
+fcast <- forecast(ets1)
+
+```
