@@ -135,3 +135,25 @@ output.df <- data.frame(tree=res1, treebag = res.treebag, lda = res4)
 output.df
 irr::kappam.light(output.df[, 1:3])
 ```
+
+    tree treebag lda
+1     C       B   B
+2     C       A   C
+3     C       B   C
+4     A       A   A
+5     A       A   A
+6     E       E   D
+7     D       D   D
+8     C       B   B
+9     A       A   A
+10    A       A   A
+11    B       C   B
+12    C       C   C
+13    C       B   B
+14    A       A   A
+15    E       E   E
+16    E       E   E
+17    C       A   A
+18    B       B   B
+19    C       B   A
+20    C       B   B
