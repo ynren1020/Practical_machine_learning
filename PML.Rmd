@@ -134,6 +134,7 @@ res4
 table(res1, res.treebag, res4)
 output.df <- data.frame(tree=res1, treebag = res.treebag, lda = res4)
 output.df
+irr::kappam.light(output.df[, 1:3])
 ```
 
 
